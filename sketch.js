@@ -10,12 +10,10 @@ let gameOver = false;
 let showInstructions = false;
 let bgImg;
 
-
-
 function preload() {
   img = loadImage("SquidIdle1.png");
   myFont = loadFont('Minecraft.ttf')
-  bgImg = loadImage("Doodle Background.png"); // ← replace later
+  bgImg = loadImage("Doodle Background.png");
 }
 
 function setup() {
@@ -23,10 +21,11 @@ function setup() {
   imageMode(CENTER);
 
   player = new Player(width / 2, height, img);
-  platforms.push(new GreenPlatform(player.x, player.y + 40));
+  
+  let start = new GreenPlatform(player.x, player.y + 40);
+  start.isStartPlatform = true;
+  platforms.push(start);
 
-
-  // Additional starting platforms
   for (let i = 0; i < 8; i++) {
     let px = random(100, width - 200);
     let py = height - i * 150;
@@ -48,14 +47,14 @@ function draw() {
     image(bgImg, width / 2, height / 2, width, height);
   }
 
-  if(keyIsPressed === false){
+  if (keyIsPressed === false) {
     text("Press '?' for instructions", width/2, height/2);
   }
 
   if (showInstructions) {
-  drawInstructions();
-  return; 
-}
+    drawInstructions();
+    return; 
+  }
 
   if (gameOver) {
     GO();
@@ -69,14 +68,8 @@ function draw() {
 
   spawnPlatforms();
 
-  // Draw green platforms
   for (let p of platforms) p.draw();
-
-  // Update/draw moving red platforms
-  for (let rp of redPlatforms) {
-    rp.update();
-    rp.draw();
-  }
+  for (let rp of redPlatforms) { rp.update(); rp.draw(); }
 
   player.update();
   player.draw();
@@ -86,14 +79,6 @@ function draw() {
   if (player.y - cameraY > height + 100){
     gameOver = true;
   }
-}
-
-function keyPressed() {
-  pressedKeys[keyCode] = true;
-}
-
-function keyReleased() {
-  delete pressedKeys[keyCode];
 }
 
 class Player {
@@ -113,10 +98,9 @@ class Player {
     this.handleMovementKeys();
     this.applyGravity();
     this.checkPlatformCollision(platforms);
-    this.checkPlatformCollision(redPlatforms); // ← treat red the same
+    this.checkPlatformCollision(redPlatforms);
     this.constrainToScreen();
 
-    // Camera follow
     if (this.y - cameraY < height * 0.4) {
       cameraY = this.y - height * 0.4;
     }
@@ -124,64 +108,43 @@ class Player {
 
   handleMovementKeys() {
     let mvmt = 0;
-
-    if (keyIsDown(65)) { // A
-      mvmt -= 1;
-      this.facing = -1;
-    }
-    if (keyIsDown(68)) { // D
-      mvmt += 1;
-      this.facing = 1;
-    }
-
+    if (keyIsDown(65)) { mvmt -= 1; this.facing = -1; }
+    if (keyIsDown(68)) { mvmt += 1; this.facing = 1; }
     this.vx = mvmt * this.speed;
     this.x += this.vx;
   }
 
-  applyGravity() {
-    this.y += this.vy;
-    this.vy += this.gravity;
-  }
-
-  constrainToScreen() {
-    this.x = constrain(this.x, 50, width - 50);
-  }
+  applyGravity() { this.y += this.vy; this.vy += this.gravity; }
+  constrainToScreen() { this.x = constrain(this.x, 50, width - 50); }
 
   checkPlatformCollision(list) {
-  for (let p of list) {
+    for (let p of list) {
 
-   
-    let left = p.x - p.w / 2;
-    let right = p.x + p.w / 2;
-    let top = p.y - p.h / 2;
-    let bottom = p.y + p.h / 2;
+      let left = p.x - p.w / 2;
+      let right = p.x + p.w / 2;
+      let top = p.y - p.h / 2;
 
-    let withinX = this.x > left && this.x < right;
-    let playerBottom = this.y + 50;
+      let withinX = this.x > left && this.x < right;
+      let playerBottom = this.y + 50;
 
-    // Player must be falling downward
-    let hitting = playerBottom >= top && playerBottom <= top + 20;
+      let hitting = playerBottom >= top && playerBottom <= top + 20;
 
-    if (withinX && hitting && this.vy > 0) {
+      if (withinX && hitting && this.vy > 0) {
+        this.y = top - 50;
+        this.vy = 0;
 
+        let micLevel = mic.getLevel();
+        if (micLevel >= p.requiredVolume) {
+          let jumpBoost = map(micLevel, 0, 0.3, -20, -60);
+          jumpBoost = constrain(jumpBoost, -20, -60);
+          this.vy = jumpBoost;
 
-      this.y = top - 50;
-      this.vy = 0;
-
-      let micLevel = mic.getLevel();
-      if (micLevel >= p.requiredVolume) {
-        let jumpBoost = map(micLevel, 0, 0.3, -20, -60);
-        jumpBoost = constrain(jumpBoost, -20, -60);
-        this.vy = jumpBoost;
-
-        deletePlatformsBelow(p.y);
+          deletePlatformsBelow(p.y);
+        }
+        break;
       }
-
-      break;
     }
   }
-}
-
 
   draw() {
     push();
@@ -198,8 +161,8 @@ class GreenPlatform {
     this.y = y;
     this.w = 120;
     this.h = 20;
-
     this.requiredVolume = random(0.01, 0.30);
+    this.isStartPlatform = false; 
   }
 
   draw() {
@@ -221,18 +184,13 @@ class RedPlatform {
     this.y = y;
     this.w = 120;
     this.h = 20;
-
     this.requiredVolume = random(0.01, 0.30);
     this.speed = random(1, 3) * (random() < 0.5 ? -1 : 1);
   }
 
   update() {
     this.x += this.speed;
-
-    // bounce at edges
-    if (this.x <= 0 || this.x + this.w >= width) {
-      this.speed *= -1;
-    }
+    if (this.x <= 0 || this.x + this.w >= width) this.speed *= -1;
   }
 
   draw() {
@@ -259,7 +217,6 @@ function spawnPlatforms() {
 
     platforms.push(new GreenPlatform(newX, newY));
 
-    // Sometimes add a moving red one
     if (random() < 0.25) {
       let rx = random(80, width - 80);
       redPlatforms.push(new RedPlatform(rx, newY - 60));
@@ -270,7 +227,7 @@ function spawnPlatforms() {
 }
 
 function deletePlatformsBelow(yLevel) {
-  platforms = platforms.filter(p => p.y <= yLevel);
+  platforms = platforms.filter(p => p.isStartPlatform || p.y <= yLevel);
   redPlatforms = redPlatforms.filter(rp => rp.y <= yLevel);
 }
 
@@ -296,7 +253,9 @@ function restartGame() {
   platforms = [];
   redPlatforms = [];
 
-  platforms.push(new GreenPlatform(player.x - 60, player.y + 40));
+  let start = new GreenPlatform(player.x, player.y + 40);
+  start.isStartPlatform = true;
+  platforms.push(start);
 
   for (let i = 0; i < 8; i++) {
     let px = random(100, width - 200);
@@ -306,15 +265,8 @@ function restartGame() {
 }
 
 function keyPressed() {
-  if (gameOver && keyIsDown(70)) {
-    restartGame();
-    return;
-  }
-  if (key === "?" || key == "/") {
-    showInstructions = !showInstructions;
-    return;
-  }
-
+  if (gameOver && keyIsDown(70)) { restartGame(); return; }
+  if (key === "?" || key == "/") { showInstructions = !showInstructions; return; }
   pressedKeys[keyCode] = true;
 }
 
